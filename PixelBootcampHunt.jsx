@@ -1,0 +1,545 @@
+import React, { useState, useEffect } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, doc, setDoc, updateDoc, onSnapshot, collection, serverTimestamp, query } from 'firebase/firestore';
+import { Trophy, CheckCircle, Play, Square, Star, Smartphone, Users, ArrowRight, BarChart3, Clock } from 'lucide-react';
+
+// --- DEINE FIREBASE CONFIG HIER EINFÜGEN ---
+// Ersetze den Bereich zwischen den geschweiften Klammern mit deinen Daten von der Firebase Konsole.
+const firebaseConfig = {
+  apiKey: "AIzaSyCNw2VGI326G6npQLr5inYwb9ZDVMgy6JA",
+  authDomain: "bootcamp-4b851.firebaseapp.com",
+  projectId: "bootcamp-4b851",
+  storageBucket: "bootcamp-4b851.firebasestorage.app",
+  messagingSenderId: "579476922275",
+  appId: "1:579476922275:web:5476fad85409cc444a0416",
+  measurementId: "G-D1NKTP1NXQ"
+};
+
+// Initialisierung (Fehler abfangen, falls Config fehlt)
+let app, auth, db;
+try {
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+} catch (e) {
+  console.error("Firebase konnte nicht gestartet werden. Hast du die Config eingetragen?", e);
+}
+
+const APP_ID = 'pixel-bootcamp-hamburg-2025';
+
+// --- DATA & CONSTANTS ---
+const GROUPS = [
+  { id: 'red', name: 'Rot', color: 'bg-red-500', hex: '#EA4335' },
+  { id: 'green', name: 'Grün', color: 'bg-green-500', hex: '#34A853' },
+  { id: 'yellow', name: 'Gelb', color: 'bg-yellow-400', hex: '#FBBC05' },
+  { id: 'blue', name: 'Blau', color: 'bg-blue-500', hex: '#4285F4' },
+];
+
+const QUESTIONS_SOURCE = [
+  // --- BOOTCAMP SPECIFIC ---
+  { q: "Wer betreut die Station 'Kochen' im ersten Durchgang?", options: ["Sönke", "Mathias", "Joanna", "Koray M."], correct: 0 },
+  { q: "Wie viele Gruppen gibt es beim Bootcamp?", options: ["3", "4", "5", "6"], correct: 1 },
+  { q: "Um wie viel Uhr beginnt der erste Durchgang?", options: ["11:30", "12:00", "12:25", "13:00"], correct: 1 },
+  { q: "Welches Tool wird für die Musikerkennung genutzt?", options: ["Shazam", "SoundSearch", "Circle to Search", "Ask Google"], correct: 2 },
+  { q: "Wer leitet die Station 'Music Master'?", options: ["Joanna", "Koray M.", "Sönke", "Mathias"], correct: 1 },
+  { q: "Was ist ein 'Personal Prop' für jeden Teilnehmer?", options: ["Notizblock", "Pixel 10", "Laptop", "Kopfhörer"], correct: 1 },
+  { q: "Wie lange dauert eine Quiz Session laut Plan?", options: ["10 min", "15 min", "20 min", "30 min"], correct: 2 },
+  { q: "Welche Station betreut Joanna im ersten Durchgang?", options: ["Reisen", "Kochen", "Balling", "Music"], correct: 0 },
+  // --- PIXEL 10 TECH SPECS ---
+  { q: "Welcher Prozessor ist im Pixel 10 verbaut?", options: ["Tensor G4", "Tensor G5", "Snapdragon 8", "Exynos 2400"], correct: 1 },
+  { q: "Wie viel Megapixel hat die Hauptkamera des Pixel 10?", options: ["12 MP", "48 MP", "50 MP", "108 MP"], correct: 2 },
+  { q: "Welches Glas schützt das Display des Pixel 10?", options: ["Gorilla Glass 5", "Victus 2", "Victus 3", "DragonTrail"], correct: 1 },
+  { q: "Wie heißt die neue Zoom-Technologie?", options: ["Super Res Zoom", "Pro Zoom", "Kamera-Coach", "OptiZoom"], correct: 0 },
+  { q: "Unterstützt das Pixel 10 Wi-Fi 7?", options: ["Ja", "Nein", "Nur Pro Modell", "Nur US Version"], correct: 0 },
+  { q: "Wie viel Arbeitsspeicher (RAM) hat das Pixel 10 Pro?", options: ["8 GB", "12 GB", "16 GB", "24 GB"], correct: 2 },
+  { q: "Wie heißt der Nachtmodus für Videos?", options: ["Night Sight Video", "Dark Video", "Moon Mode", "Low Light Cam"], correct: 0 },
+  { q: "Welche IP-Zertifizierung hat das Pixel 10?", options: ["IP67", "IP68", "IP54", "Keine"], correct: 1 },
+  { q: "Welches Material wird beim Pro-Modell Rahmen verwendet?", options: ["Aluminium", "Edelstahl", "Titan", "Kunststoff"], correct: 0 },
+  // --- GEMINI & AI FEATURES ---
+  { q: "Wie startest du Gemini auf dem Pixel?", options: ["Power Button lang drücken", "Schütteln", "Home Button 3x", "Lautstärke hoch"], correct: 0 },
+  { q: "Was kann 'Hold for Me'?", options: ["Musik abspielen", "In der Warteschleife bleiben", "Anrufe aufzeichnen", "Spam blockieren"], correct: 1 },
+  { q: "Was macht der 'Magische Radierer'?", options: ["Apps löschen", "Objekte aus Fotos entfernen", "Speicher bereinigen", "Display ausschalten"], correct: 1 },
+  { q: "Welches Feature hilft bei Gruppenfotos, damit alle lächeln?", options: ["Best Take", "Smile Shot", "Group Fix", "Happy Cam"], correct: 0 },
+  { q: "Wie heißt die Funktion, um Dinge auf dem Bildschirm zu suchen?", options: ["Screen Search", "Circle to Search", "Lens", "Find it"], correct: 1 },
+  { q: "Kann Gemini Zusammenfassungen von E-Mails erstellen?", options: ["Ja", "Nein", "Nur auf Englisch", "Nur im Browser"], correct: 0 },
+  { q: "Wie heißt der Assistent für kreative Texte?", options: ["Word Flow", "Magic Compose", "Help me write", "Text AI"], correct: 2 },
+  // --- FILLER ---
+  { q: "Welches Android läuft auf der Pixel 10 Serie?", options: ["Android 14", "Android 15", "Android 16", "Android X"], correct: 2 },
+  { q: "Wie viel Zoom bietet das Pixel 10 Pro optisch?", options: ["3x", "5x", "10x", "2x"], correct: 1 },
+  { q: "Welche Farbe hat das Google 'G' NICHT?", options: ["Rot", "Gelb", "Lila", "Blau"], correct: 2 },
+  { q: "Wo findet das Bootcamp statt?", options: ["Google Office", "Messehalle", "Hotel Atlantic", "Elbphilharmonie"], correct: 0 },
+  { q: "Was gibt es für richtig beantwortete Fragen?", options: ["Gummibärchen", "Punkte", "Pixel Phones", "Nichts"], correct: 1 },
+  { q: "Was ist Veo3?", options: ["Ein Spiel", "Ein Videogenerator", "Ein Prozessor", "Ein Display"], correct: 1 },
+  { q: "Wie schwer ist das Pixel 10 etwa?", options: ["150g", "199g", "250g", "300g"], correct: 1 },
+  { q: "Welche Lade-Technologie wird unterstützt?", options: ["Qi2", "MagSafe", "Nur Kabel", "Solar"], correct: 0 },
+  { q: "Gibt es einen 'Kamera-Coach'?", options: ["Ja", "Nein", "Vielleicht", "Nur beim Fold"], correct: 0 },
+  { q: "Wie lange gibt es Sicherheitsupdates?", options: ["3 Jahre", "5 Jahre", "7 Jahre", "10 Jahre"], correct: 2 },
+  { q: "Welches Pixel ist das größte?", options: ["Pixel 10", "Pixel 10 Pro", "Pixel 10 Pro XL", "Pixel 10 Mini"], correct: 2 },
+  { q: "Was ist 'Private Space'?", options: ["Ein Cloud Speicher", "Ein gesperrter App-Bereich", "Ein VPN", "Ein Meetingraum"], correct: 1 },
+  { q: "Kann man mit dem Pixel 10 Astrofotos machen?", options: ["Ja", "Nein", "Nur tagsüber", "Nur mit Stativ"], correct: 0 },
+  { q: "Hat das Pixel 10 eine Temperatur-Messung?", options: ["Ja (Pro)", "Nein", "Nur das Fold", "Alle Modelle"], correct: 0 },
+  { q: "Wie heißt die KI für Audio-Notizen?", options: ["Recorder", "Listen Up", "Audio AI", "Sound Note"], correct: 0 },
+  { q: "Ist das Pixel 10 Pro Fold faltbar?", options: ["Ja", "Nein", "Nur das Display", "Vielleicht"], correct: 0 }
+];
+
+// --- COMPONENTS ---
+
+const LoginScreen = ({ onJoin }) => {
+  const [name, setName] = useState('');
+  const [selectedGroup, setSelectedGroup] = useState(null);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (name && (selectedGroup || name.toLowerCase() === 'admin')) {
+      onJoin(name, selectedGroup);
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen p-6 w-full max-w-md mx-auto relative z-10">
+      <div className="glass-panel w-full p-8 animate-fade-in">
+        <div className="flex justify-center mb-6">
+          <div className="p-3 bg-white rounded-full shadow-lg">
+            <Smartphone size={40} className="text-blue-500" />
+          </div>
+        </div>
+        <h1 className="text-3xl font-bold text-center text-gray-800 mb-2">Pixel Bootcamp</h1>
+        <p className="text-center text-gray-500 mb-8">Scavenger Hunt Hamburg</p>
+        
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Dein Name</label>
+            <input 
+              type="text" 
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white/50 backdrop-blur-sm transition-all"
+              placeholder="Eingeben..."
+            />
+          </div>
+
+          {name.toLowerCase() !== 'admin' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Deine Gruppe</label>
+              <div className="grid grid-cols-4 gap-3">
+                {GROUPS.map((group) => (
+                  <button
+                    key={group.id}
+                    type="button"
+                    onClick={() => setSelectedGroup(group)}
+                    className={`h-14 rounded-xl transition-all transform hover:scale-105 ${group.color} ${selectedGroup?.id === group.id ? 'ring-4 ring-offset-2 ring-gray-400 scale-105 shadow-lg' : 'opacity-70 hover:opacity-100'}`}
+                    aria-label={group.name}
+                  >
+                    {selectedGroup?.id === group.id && <CheckCircle className="mx-auto text-white" size={20} />}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <button 
+            type="submit"
+            disabled={!name || (!selectedGroup && name.toLowerCase() !== 'admin')}
+            className="w-full py-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transform active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            Starten <ArrowRight size={20} />
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+const QuizScreen = ({ questionData, onAnswer, questionIndex, totalQuestions }) => {
+  const isDoublePoints = questionData.isDouble;
+  return (
+    <div className="flex flex-col h-full p-4 max-w-md mx-auto relative z-10 pt-20 pb-20">
+      <div className="w-full bg-gray-200 rounded-full h-2 mb-6">
+        <div 
+          className="bg-blue-600 h-2 rounded-full transition-all duration-500" 
+          style={{ width: `${((questionIndex) / totalQuestions) * 100}%` }}
+        ></div>
+      </div>
+
+      <div className={`glass-panel p-6 mb-6 relative ${isDoublePoints ? 'border-yellow-400 border-2 shadow-yellow-200/50' : ''}`}>
+        {isDoublePoints && (
+          <div className="absolute -top-4 -right-4 bg-yellow-400 text-yellow-900 text-xs font-bold px-3 py-1 rounded-full shadow-md flex items-center gap-1 animate-bounce">
+            <Star size={12} fill="currentColor" />
+            DOUBLE POINTS
+          </div>
+        )}
+        <h2 className="text-xl font-bold text-gray-800 leading-snug">
+          {questionData.q}
+        </h2>
+      </div>
+
+      <div className="space-y-3">
+        {questionData.options.map((option, idx) => (
+          <button
+            key={idx}
+            onClick={() => onAnswer(idx)}
+            className="w-full p-4 text-left bg-white/60 hover:bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-white/40 transition-all active:scale-98 text-gray-800 font-medium flex items-center justify-between group"
+          >
+            <span>{option}</span>
+            <div className="w-5 h-5 rounded-full border-2 border-gray-300 group-hover:border-blue-500"></div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const FeedbackScreen = ({ onSubmitFeedback }) => {
+  const [ratingEvent, setRatingEvent] = useState(0);
+  const [ratingPixel, setRatingPixel] = useState(0);
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen p-6 relative z-10 max-w-md mx-auto">
+      <div className="glass-panel w-full p-6 animate-fade-in">
+        <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">Fast geschafft!</h2>
+        <div className="mb-8">
+          <p className="text-gray-700 font-medium mb-3 text-center">Wie hilfreich war das Event für dein Tagesgeschäft?</p>
+          <div className="flex justify-between px-2">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button key={star} onClick={() => setRatingEvent(star)} className="transform hover:scale-110 transition-transform">
+                <Star size={32} fill={ratingEvent >= star ? "#FBBC05" : "none"} color={ratingEvent >= star ? "#FBBC05" : "#CBD5E1"} />
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="mb-8">
+          <p className="text-gray-700 font-medium mb-3 text-center">Würdest du ein Pixel Phone deinem Kunden empfehlen?</p>
+          <div className="flex justify-between px-2">
+            {[1, 2, 3, 4, 5].map((val) => (
+              <button 
+                key={val} 
+                onClick={() => setRatingPixel(val)} 
+                className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all ${ratingPixel === val ? 'bg-blue-500 text-white shadow-lg scale-110' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+              >
+                {val}
+              </button>
+            ))}
+          </div>
+        </div>
+        <button 
+          onClick={() => onSubmitFeedback(ratingEvent, ratingPixel)}
+          disabled={!ratingEvent || !ratingPixel}
+          className="w-full py-3 bg-green-500 text-white rounded-xl font-bold shadow-lg disabled:opacity-50 hover:bg-green-600 transition-colors"
+        >
+          Absenden & Punkte sichern
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const InfoScreen = ({ message, subtext, icon: Icon, color = "text-red-500" }) => (
+  <div className="flex flex-col items-center justify-center min-h-screen p-6 relative z-10 max-w-md mx-auto text-center">
+    <div className="glass-panel w-full p-8 flex flex-col items-center animate-fade-in">
+      <div className="bg-white p-4 rounded-full shadow-md mb-4">
+        <Icon size={48} className={color} />
+      </div>
+      <h2 className="text-2xl font-bold text-gray-800 mb-2">{message}</h2>
+      <p className="text-gray-600 mb-6">{subtext}</p>
+    </div>
+  </div>
+);
+
+const AdminDashboard = ({ gameState, users, onStartGame, onStopGame, onResetGame }) => {
+  const [durationInput, setDurationInput] = useState(15);
+  const sortedUsers = [...users].sort((a, b) => b.score - a.score || (a.finishedAt?.seconds || 9999999999) - (b.finishedAt?.seconds || 9999999999));
+
+  return (
+    <div className="min-h-screen p-4 md:p-8 relative z-10 max-w-4xl mx-auto">
+      <div className="glass-panel p-6 mb-6">
+        <div className="flex justify-between items-center mb-6 border-b border-gray-200 pb-4">
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <BarChart3 className="text-blue-600" /> Admin Control Center
+          </h1>
+          <div className="flex items-center gap-2">
+            <span className={`px-3 py-1 rounded-full text-sm font-bold ${gameState?.status === 'running' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+              Status: {gameState?.status?.toUpperCase() || 'IDLE'}
+            </span>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div className="space-y-4">
+            <h3 className="font-bold text-gray-600 uppercase text-xs tracking-wider">Game Controls</h3>
+            <div className="flex gap-2 items-center">
+              <label className="text-sm font-medium">Dauer (Min):</label>
+              <input 
+                type="number" 
+                value={durationInput} 
+                onChange={(e) => setDurationInput(parseInt(e.target.value) || 1)}
+                className="w-16 p-2 rounded-lg border border-gray-300"
+                disabled={gameState?.status === 'running'}
+              />
+            </div>
+            <div className="flex gap-2">
+              {gameState?.status !== 'running' ? (
+                <button onClick={() => onStartGame(durationInput)} className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-lg font-bold flex items-center justify-center gap-2">
+                  <Play size={18} /> Start
+                </button>
+              ) : (
+                <button onClick={onStopGame} className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-lg font-bold flex items-center justify-center gap-2">
+                  <Square size={18} /> STOP ALL
+                </button>
+              )}
+              <button onClick={onResetGame} className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium">Reset</button>
+            </div>
+          </div>
+          <div>
+             <h3 className="font-bold text-gray-600 uppercase text-xs tracking-wider mb-2">Live Stats</h3>
+             <div className="grid grid-cols-2 gap-2">
+               <div className="bg-white/50 p-3 rounded-lg text-center">
+                 <div className="text-2xl font-bold text-blue-600">{users.length}</div>
+                 <div className="text-xs text-gray-500">Active Players</div>
+               </div>
+               <div className="bg-white/50 p-3 rounded-lg text-center">
+                 <div className="text-2xl font-bold text-green-600">{users.filter(u => u.finished).length}</div>
+                 <div className="text-xs text-gray-500">Finished</div>
+               </div>
+             </div>
+          </div>
+        </div>
+
+        <h3 className="font-bold text-gray-800 mb-4 text-lg">Leaderboard</h3>
+        <div className="overflow-x-auto bg-white/60 rounded-xl">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-gray-100/80 text-gray-600 uppercase font-bold text-xs">
+              <tr>
+                <th className="p-3">Rank</th>
+                <th className="p-3">Name</th>
+                <th className="p-3">Group</th>
+                <th className="p-3 text-right">Score</th>
+                <th className="p-3 text-right">Correct</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedUsers.map((user, idx) => (
+                <tr key={user.id} className="border-b border-gray-200/50 hover:bg-white/50 transition-colors">
+                  <td className="p-3 font-bold text-gray-500">#{idx + 1}</td>
+                  <td className="p-3 font-medium">{user.name}</td>
+                  <td className="p-3"><span className={`px-2 py-1 rounded text-xs text-white ${user.group?.color || 'bg-gray-400'}`}>{user.group?.name || '-'}</span></td>
+                  <td className="p-3 text-right font-bold text-blue-600">{user.score}</td>
+                  <td className="p-3 text-right">{user.correctCount || 0}/40</td>
+                </tr>
+              ))}
+              {sortedUsers.length === 0 && <tr><td colSpan="5" className="p-4 text-center text-gray-500">Waiting for players...</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [userId, setUserId] = useState(null);
+  const [gameState, setGameState] = useState({ status: 'loading' });
+  const [timeLeft, setTimeLeft] = useState(null);
+  const [quizQuestions, setQuizQuestions] = useState([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [score, setScore] = useState(0);
+  const [correctCount, setCorrectCount] = useState(0);
+  const [hasFinished, setHasFinished] = useState(false);
+  const [allUsers, setAllUsers] = useState([]);
+
+  useEffect(() => {
+    if(!auth) return;
+    const unsubscribe = onAuthStateChanged(auth, async (u) => {
+      if (u) {
+        setUserId(u.uid);
+      } else {
+        await signInAnonymously(auth);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!userId || !db) return;
+    const gameRef = doc(db, 'artifacts', APP_ID, 'public', 'gameState');
+    const unsub = onSnapshot(gameRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setGameState(data);
+        if (data.status === 'running' && data.endTime) {
+          const end = data.endTime.toMillis();
+          const updateTimer = () => {
+            const now = Date.now();
+            const remaining = Math.max(0, Math.ceil((end - now) / 1000));
+            setTimeLeft(remaining);
+          };
+          updateTimer();
+          const interval = setInterval(updateTimer, 1000);
+          return () => clearInterval(interval);
+        }
+      } else {
+        setGameState({ status: 'waiting' });
+      }
+    });
+    return () => unsub();
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId || !user?.isAdmin || !db) return;
+    const q = query(collection(db, 'artifacts', APP_ID, 'users'));
+    const unsub = onSnapshot(q, (snap) => {
+      const usersList = [];
+      snap.forEach(doc => usersList.push({ id: doc.id, ...doc.data() }));
+      setAllUsers(usersList);
+    });
+    return () => unsub();
+  }, [userId, user?.isAdmin]);
+
+  useEffect(() => {
+    const shuffled = [...QUESTIONS_SOURCE].sort(() => 0.5 - Math.random());
+    const selected = shuffled.slice(0, 40).map(q => ({
+      ...q,
+      isDouble: Math.random() > 0.8
+    }));
+    setQuizQuestions(selected);
+  }, []);
+
+  const handleJoin = async (name, group) => {
+    const isAdmin = name.toLowerCase() === 'admin';
+    const userData = { name, group, isAdmin, score: 0, joinedAt: serverTimestamp() };
+    setUser(userData);
+    if (!isAdmin && userId && db) {
+      await setDoc(doc(db, 'artifacts', APP_ID, 'users', userId), userData);
+    }
+  };
+
+  const handleAnswer = async (optionIndex) => {
+    const currentQ = quizQuestions[currentQuestionIndex];
+    const isCorrect = optionIndex === currentQ.correct;
+    let points = 0;
+    if (isCorrect) {
+      points = currentQ.isDouble ? 10 : 5;
+      setScore(prev => prev + points);
+      setCorrectCount(prev => prev + 1);
+    }
+    if (currentQuestionIndex < quizQuestions.length - 1) {
+      setCurrentQuestionIndex(prev => prev + 1);
+      if (userId && db) {
+         await updateDoc(doc(db, 'artifacts', APP_ID, 'users', userId), {
+           score: score + points,
+           correctCount: correctCount + (isCorrect ? 1 : 0)
+         });
+      }
+    } else {
+      setHasFinished(true);
+    }
+  };
+
+  const handleSubmitFeedback = async (ratingEvent, ratingPixel) => {
+    if (userId && db) {
+      await updateDoc(doc(db, 'artifacts', APP_ID, 'users', userId), {
+        finished: true,
+        finishedAt: serverTimestamp(),
+        feedback: { event: ratingEvent, pixel: ratingPixel }
+      });
+    }
+    setUser(prev => ({ ...prev, finished: true }));
+  };
+
+  const handleStartGame = async (minutes) => {
+    if(!db) return;
+    const endTime = new Date();
+    endTime.setMinutes(endTime.getMinutes() + minutes);
+    await setDoc(doc(db, 'artifacts', APP_ID, 'public', 'gameState'), {
+      status: 'running',
+      endTime: endTime,
+      startTime: serverTimestamp()
+    });
+  };
+
+  const handleStopGame = async () => {
+    if(!db) return;
+    await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'gameState'), { status: 'stopped' });
+  };
+
+  const handleResetGame = async () => {
+     if(!db) return;
+     await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'gameState'), { status: 'waiting', endTime: null });
+  };
+
+  const formatTime = (seconds) => {
+    if (!seconds) return "00:00";
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  if (user && user.isAdmin) {
+    return (
+      <div className="min-h-screen bg-gray-100 font-sans">
+        <AdminDashboard gameState={gameState} users={allUsers} onStartGame={handleStartGame} onStopGame={handleStopGame} onResetGame={handleResetGame}/>
+      </div>
+    );
+  }
+
+  if (!user && !userId) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div></div>;
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-100 via-yellow-50 to-blue-100 overflow-hidden font-sans">
+        <div className="absolute top-0 left-0 w-full h-full opacity-40 pointer-events-none" style={{backgroundImage: 'radial-gradient(circle at 20% 20%, rgba(66, 133, 244, 0.4) 0%, transparent 25%), radial-gradient(circle at 80% 80%, rgba(234, 67, 53, 0.4) 0%, transparent 25%)'}}></div>
+        <LoginScreen onJoin={handleJoin} />
+      </div>
+    );
+  }
+
+  if (gameState.status === 'stopped' || (timeLeft === 0 && gameState.status === 'running')) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 font-sans">
+         <InfoScreen icon={Clock} message="Die Zeit ist leider abgelaufen" subtext="Komme gerne zurück in den Schulungsraum für die Auswertung." />
+      </div>
+    );
+  }
+
+  if (gameState.status === 'waiting') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 font-sans">
+         <InfoScreen icon={Users} color="text-blue-500" message="Warte auf Start..." subtext={`Hallo ${user.name}! Mach dich bereit.`} />
+      </div>
+    );
+  }
+
+  if (user.finished) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 font-sans">
+         <InfoScreen icon={Trophy} color="text-yellow-500" message="Gut gemacht!" subtext={`Du hast ${score} Punkte erreicht.`} />
+      </div>
+    );
+  }
+
+  if (hasFinished) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 font-sans">
+        <FeedbackScreen onSubmitFeedback={handleSubmitFeedback} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 font-sans overflow-hidden flex flex-col">
+      <div className="fixed top-[-10%] left-[-10%] w-[50%] h-[50%] bg-red-400/20 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="fixed bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-400/20 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="glass-panel mx-4 mt-4 p-3 flex justify-between items-center relative z-20">
+        <div className="flex items-center gap-2">
+           <div className={`w-3 h-3 rounded-full ${user.group?.color}`}></div>
+           <span className="font-bold text-gray-700 text-sm">{user.name}</span>
+        </div>
+        <div className={`font-mono text-xl font-bold ${timeLeft < 60 ? 'text-red-500 animate-pulse' : 'text-gray-800'}`}>{formatTime(timeLeft)}</div>
+        <div className="flex items-center gap-1"><span className="font-bold text-blue-600">{score}</span><span className="text-xs text-gray-500">Pts</span></div>
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        <QuizScreen questionData={quizQuestions[currentQuestionIndex]} onAnswer={handleAnswer} questionIndex={currentQuestionIndex} totalQuestions={quizQuestions.length}/>
+      </div>
+    </div>
+  );
+}
