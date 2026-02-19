@@ -17,14 +17,25 @@
       font-family: 'Google Sans', sans-serif;
       overscroll-behavior-y: none;
     }
+    
+    /* Standard Glas-Design für das Spiel */
     .glass-panel {
-      background-color: rgba(255, 255, 255, 0.4);
+      background-color: rgba(255, 255, 255, 0.6);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+      border-radius: 1rem;
+    }
+
+    /* Solid Design für End-Screen (Kein Blur, weißer Hintergrund) */
+    .solid-panel {
+      background-color: #ffffff;
+      border: 1px solid rgba(0, 0, 0, 0.1);
       box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
       border-radius: 1rem;
     }
+
     .animate-fade-in {
       animation: fadeIn 0.5s ease-out forwards;
     }
@@ -34,7 +45,7 @@
     }
   </style>
 
-  <!-- Import Map: Damit der Browser weiß, woher er React & Firebase bekommt -->
+  <!-- Import Map -->
   <script type="importmap">
     {
       "imports": {
@@ -48,7 +59,7 @@
     }
   </script>
 
-  <!-- Babel für JSX -->
+  <!-- Babel -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body>
@@ -63,7 +74,7 @@
     import { getFirestore, doc, setDoc, updateDoc, onSnapshot, collection, serverTimestamp, query } from 'firebase/firestore';
     import { Trophy, CheckCircle, Play, Square, Star, Smartphone, Users, ArrowRight, BarChart3, Clock } from 'lucide-react';
 
-    // --- FIREBASE CONFIGURATION (Deine Daten) ---
+    // --- FIREBASE CONFIGURATION ---
     const firebaseConfig = {
       apiKey: "AIzaSyCNw2VGI326G6npQLr5inYwb9ZDVMgy6JA",
       authDomain: "bootcamp-4b851.firebaseapp.com",
@@ -94,51 +105,55 @@
       { id: 'blue', name: 'Blau', color: 'bg-blue-500', hex: '#4285F4' },
     ];
 
+    // --- NEUE FRAGEN (Nur aus den Google Sheets) ---
     const QUESTIONS_SOURCE = [
-      // --- BOOTCAMP SPECIFIC ---
-      { q: "Wer betreut die Station 'Kochen' im ersten Durchgang?", options: ["Sönke", "Mathias", "Joanna", "Koray M."], correct: 0 },
-      { q: "Wie viele Gruppen gibt es beim Bootcamp?", options: ["3", "4", "5", "6"], correct: 1 },
-      { q: "Um wie viel Uhr beginnt der erste Durchgang?", options: ["11:30", "12:00", "12:25", "13:00"], correct: 1 },
-      { q: "Welches Tool wird für die Musikerkennung genutzt?", options: ["Shazam", "SoundSearch", "Circle to Search", "Ask Google"], correct: 2 },
-      { q: "Wer leitet die Station 'Music Master'?", options: ["Joanna", "Koray M.", "Sönke", "Mathias"], correct: 1 },
-      { q: "Was ist ein 'Personal Prop' für jeden Teilnehmer?", options: ["Notizblock", "Pixel 10", "Laptop", "Kopfhörer"], correct: 1 },
-      { q: "Wie lange dauert eine Quiz Session laut Plan?", options: ["10 min", "15 min", "20 min", "30 min"], correct: 2 },
-      { q: "Welche Station betreut Joanna im ersten Durchgang?", options: ["Reisen", "Kochen", "Balling", "Music"], correct: 0 },
-      // --- PIXEL 10 TECH SPECS ---
-      { q: "Welcher Prozessor ist im Pixel 10 verbaut?", options: ["Tensor G4", "Tensor G5", "Snapdragon 8", "Exynos 2400"], correct: 1 },
-      { q: "Wie viel Megapixel hat die Hauptkamera des Pixel 10?", options: ["12 MP", "48 MP", "50 MP", "108 MP"], correct: 2 },
-      { q: "Welches Glas schützt das Display des Pixel 10?", options: ["Gorilla Glass 5", "Victus 2", "Victus 3", "DragonTrail"], correct: 1 },
-      { q: "Wie heißt die neue Zoom-Technologie?", options: ["Super Res Zoom", "Pro Zoom", "Kamera-Coach", "OptiZoom"], correct: 0 },
-      { q: "Unterstützt das Pixel 10 Wi-Fi 7?", options: ["Ja", "Nein", "Nur Pro Modell", "Nur US Version"], correct: 0 },
+      // Hardware Specs
+      { q: "Welcher Chip ist im Pixel 10 verbaut?", options: ["Tensor G5", "Tensor G4", "Snapdragon 8", "Exynos 2400"], correct: 0 },
+      { q: "Wie viel MP hat die Hauptkamera des Pixel 10?", options: ["12 MP", "48 MP", "50 MP", "108 MP"], correct: 2 },
+      { q: "Welches Glas schützt das Display laut Specs?", options: ["Gorilla Glass Victus 3", "Gorilla Glass Victus 2", "Gorilla Glass 5", "DragonTrail"], correct: 0 },
+      { q: "Wie viel optischen Zoom bietet das Pro-Modell?", options: ["3-fach", "5-fach", "10-fach", "2-fach"], correct: 1 },
+      { q: "Welches Material nutzt das Pro-Modell für den Rahmen?", options: ["Titan & Glas", "Edelstahl", "Aluminium", "Kunststoff"], correct: 0 },
+      { q: "Wie viel MP hat die neue Frontkamera (Pro)?", options: ["50 MP", "12 MP", "10.5 MP", "24 MP"], correct: 0 },
+      { q: "Wie heißt die größte Pixel-Variante?", options: ["Pixel 10 XL", "Pixel 10 Pro XL", "Pixel 10 Ultra", "Pixel 10 Max"], correct: 1 },
+      { q: "Ist das Pixel 10 wassergeschützt?", options: ["Ja (IP68)", "Nein", "Nur Spritzwasser", "Nur das Pro"], correct: 0 },
       { q: "Wie viel Arbeitsspeicher (RAM) hat das Pixel 10 Pro?", options: ["8 GB", "12 GB", "16 GB", "24 GB"], correct: 2 },
-      { q: "Wie heißt der Nachtmodus für Videos?", options: ["Night Sight Video", "Dark Video", "Moon Mode", "Low Light Cam"], correct: 0 },
-      { q: "Welche IP-Zertifizierung hat das Pixel 10?", options: ["IP67", "IP68", "IP54", "Keine"], correct: 1 },
-      { q: "Welches Material wird beim Pro-Modell Rahmen verwendet?", options: ["Aluminium", "Edelstahl", "Titan", "Kunststoff"], correct: 0 },
-      // --- GEMINI & AI FEATURES ---
-      { q: "Wie startest du Gemini auf dem Pixel?", options: ["Power Button lang drücken", "Schütteln", "Home Button 3x", "Lautstärke hoch"], correct: 0 },
-      { q: "Was kann 'Hold for Me'?", options: ["Musik abspielen", "In der Warteschleife bleiben", "Anrufe aufzeichnen", "Spam blockieren"], correct: 1 },
+      { q: "Welches Android ist vorinstalliert?", options: ["Android 14", "Android 15", "Android 16", "Android X"], correct: 2 },
+      
+      // Features & AI
+      { q: "Wie heißt die integrierte Google-KI?", options: ["Assistant", "Bard", "Gemini", "Cortana"], correct: 2 },
+      { q: "Was ist Veo3?", options: ["Ein Videogenerator", "Ein Spiel", "Ein neuer Chip", "Ein Display-Typ"], correct: 0 },
       { q: "Was macht der 'Magische Radierer'?", options: ["Apps löschen", "Objekte aus Fotos entfernen", "Speicher bereinigen", "Display ausschalten"], correct: 1 },
-      { q: "Welches Feature hilft bei Gruppenfotos, damit alle lächeln?", options: ["Best Take", "Smile Shot", "Group Fix", "Happy Cam"], correct: 0 },
-      { q: "Wie heißt die Funktion, um Dinge auf dem Bildschirm zu suchen?", options: ["Screen Search", "Circle to Search", "Lens", "Find it"], correct: 1 },
-      { q: "Kann Gemini Zusammenfassungen von E-Mails erstellen?", options: ["Ja", "Nein", "Nur auf Englisch", "Nur im Browser"], correct: 0 },
+      { q: "Wie heißt der Modus für Nachtfotos?", options: ["Dark Mode", "Moon Shot", "Night Sight", "Low Light"], correct: 2 },
+      { q: "Was ist 'Private Space'?", options: ["Ein VPN", "Apps sperren/verstecken", "Ein Cloud Speicher", "Ein Meetingraum"], correct: 1 },
+      { q: "Wie heißt die Funktion für Astrofotos?", options: ["Astromodus", "Star Shot", "Night Sky", "Galaxy Cam"], correct: 0 },
       { q: "Wie heißt der Assistent für kreative Texte?", options: ["Word Flow", "Magic Compose", "Help me write", "Text AI"], correct: 2 },
-      // --- FILLER ---
-      { q: "Welches Android läuft auf der Pixel 10 Serie?", options: ["Android 14", "Android 15", "Android 16", "Android X"], correct: 2 },
-      { q: "Wie viel Zoom bietet das Pixel 10 Pro optisch?", options: ["3x", "5x", "10x", "2x"], correct: 1 },
-      { q: "Welche Farbe hat das Google 'G' NICHT?", options: ["Rot", "Gelb", "Lila", "Blau"], correct: 2 },
-      { q: "Wo findet das Bootcamp statt?", options: ["Google Office", "Messehalle", "Hotel Atlantic", "Elbphilharmonie"], correct: 0 },
-      { q: "Was gibt es für richtig beantwortete Fragen?", options: ["Gummibärchen", "Punkte", "Pixel Phones", "Nichts"], correct: 1 },
-      { q: "Was ist Veo3?", options: ["Ein Spiel", "Ein Videogenerator", "Ein Prozessor", "Ein Display"], correct: 1 },
-      { q: "Wie schwer ist das Pixel 10 etwa?", options: ["150g", "199g", "250g", "300g"], correct: 1 },
-      { q: "Welche Lade-Technologie wird unterstützt?", options: ["Qi2", "MagSafe", "Nur Kabel", "Solar"], correct: 0 },
-      { q: "Gibt es einen 'Kamera-Coach'?", options: ["Ja", "Nein", "Vielleicht", "Nur beim Fold"], correct: 0 },
-      { q: "Wie lange gibt es Sicherheitsupdates?", options: ["3 Jahre", "5 Jahre", "7 Jahre", "10 Jahre"], correct: 2 },
-      { q: "Welches Pixel ist das größte?", options: ["Pixel 10", "Pixel 10 Pro", "Pixel 10 Pro XL", "Pixel 10 Mini"], correct: 2 },
-      { q: "Was ist 'Private Space'?", options: ["Ein Cloud Speicher", "Ein gesperrter App-Bereich", "Ein VPN", "Ein Meetingraum"], correct: 1 },
-      { q: "Kann man mit dem Pixel 10 Astrofotos machen?", options: ["Ja", "Nein", "Nur tagsüber", "Nur mit Stativ"], correct: 0 },
+      { q: "Was ist die 'Hold for Me' Funktion?", options: ["Warteschleife halten lassen", "Anrufsperre", "Musik pausieren", "Display sperren"], correct: 0 },
+      { q: "Wie heißt die KI-Foto-Korrektur?", options: ["Magic Editor", "Photo Fix", "AI Reimagined", "Auto Improve"], correct: 0 },
+      { q: "Gibt es einen 'Kamera-Coach'?", options: ["Ja, für Tipps", "Nein", "Vielleicht", "Nur beim Fold"], correct: 0 },
+
+      // Tech Details
+      { q: "Wie lange gibt es Sicherheits-Updates?", options: ["3 Jahre", "5 Jahre", "7 Jahre", "10 Jahre"], correct: 2 },
+      { q: "Welche Ladeleistung (Watt) wird unterstützt?", options: ["20W", "30W", "45W", "100W"], correct: 2 },
+      { q: "Wie heißt die neue Magnettechnologie?", options: ["PixelDock", "MagCharge", "Qi-Plus", "TensorCharge"], correct: 1 },
+      { q: "Unterstützt das Pixel 10 Wi-Fi 7?", options: ["Ja", "Nein", "Nur Pro Modell", "Nur US Version"], correct: 0 },
+      { q: "Wie viel Basisspeicher hat das Pro?", options: ["64 GB", "128 GB", "256 GB", "512 GB"], correct: 1 },
+      { q: "Welche IP-Zertifizierung hat das Gerät?", options: ["IP67", "IP68", "IP54", "Keine"], correct: 1 },
       { q: "Hat das Pixel 10 eine Temperatur-Messung?", options: ["Ja (Pro)", "Nein", "Nur das Fold", "Alle Modelle"], correct: 0 },
-      { q: "Wie heißt die KI für Audio-Notizen?", options: ["Recorder", "Listen Up", "Audio AI", "Sound Note"], correct: 0 },
-      { q: "Ist das Pixel 10 Pro Fold faltbar?", options: ["Ja", "Nein", "Nur das Display", "Vielleicht"], correct: 0 }
+      { q: "Wie viele Mikrofone sind ca. verbaut?", options: ["1", "2", "3", "5"], correct: 2 },
+      { q: "Welches Angebot gibt es für 1 Jahr gratis?", options: ["YouTube Premium", "Fitbit Premium", "Google One AI Premium (2TB)", "Play Pass"], correct: 2 },
+      { q: "Wie schwer ist das Pixel 10 etwa?", options: ["150g", "199g", "250g", "300g"], correct: 1 },
+
+      // Usage & Ecosystem
+      { q: "Wie wird das Pixel 10 entsperrt?", options: ["Nur PIN", "Nur Muster", "Gesicht & Finger", "Spracherkennung"], correct: 2 },
+      { q: "Welchen USB-Anschluss hat das Gerät?", options: ["Micro-USB", "Lightning", "USB-C", "Wireless Only"], correct: 2 },
+      { q: "Kann Gemini Zusammenfassungen von E-Mails erstellen?", options: ["Ja", "Nein", "Nur auf Englisch", "Nur im Browser"], correct: 0 },
+      { q: "Wie ruft man Gemini meistens auf?", options: ["Power Button lang drücken", "Schütteln", "Lautstärke Taste", "Home Button 3x"], correct: 0 },
+      { q: "Was kann 'Circle to Search'?", options: ["Musik finden", "Einkreisen zum Suchen", "Kontakte anrufen", "Apps schließen"], correct: 1 },
+      { q: "Worüber kannst du mit Gemini Live sprechen?", options: ["Bildschirminhalte", "Kamerabild", "Beides", "Nichts davon"], correct: 2 },
+      { q: "Wie hoch ist die maximale Helligkeit?", options: ["1000 Nits", "2000 Nits", "3000 Nits", "5000 Nits"], correct: 2 },
+      { q: "Unterstützt es Bluetooth 5.4?", options: ["Ja", "Nein", "Nur 5.0", "Nur 5.2"], correct: 0 },
+      { q: "Ist das Pixel 10 Pro Fold faltbar?", options: ["Ja", "Nein", "Nur das Display", "Vielleicht"], correct: 0 },
+      { q: "Kann man die KI teilweise offline nutzen?", options: ["Ja (Nano)", "Nein", "Nur mit WLAN", "Nie"], correct: 0 }
     ];
 
     // --- COMPONENTS ---
@@ -292,12 +307,18 @@
       );
     };
 
-    const InfoScreen = ({ message, subtext, icon: Icon, color = "text-red-500" }) => (
+    // --- INFO SCREEN (Angepasst: Kein Blur bei 'stopped', kein rundes Icon) ---
+    const InfoScreen = ({ message, subtext, icon: Icon, color = "text-red-500", isStopped = false }) => (
       <div className="flex flex-col items-center justify-center min-h-screen p-6 relative z-10 max-w-md mx-auto text-center">
-        <div className="glass-panel w-full p-8 flex flex-col items-center animate-fade-in">
-          <div className="bg-white p-4 rounded-full shadow-md mb-4">
-            <Icon size={48} className={color} />
-          </div>
+        <div className={`${isStopped ? 'solid-panel bg-white' : 'glass-panel'} w-full p-8 flex flex-col items-center animate-fade-in`}>
+          
+          {/* Icon nur anzeigen, wenn es NICHT gestoppt ist */}
+          {!isStopped && Icon && (
+            <div className="bg-white p-4 rounded-full shadow-md mb-4">
+              <Icon size={48} className={color} />
+            </div>
+          )}
+          
           <h2 className="text-2xl font-bold text-gray-800 mb-2">{message}</h2>
           <p className="text-gray-600 mb-6">{subtext}</p>
         </div>
@@ -455,7 +476,9 @@
       }, [userId, user?.isAdmin]);
 
       useEffect(() => {
+        // Randomize
         const shuffled = [...QUESTIONS_SOURCE].sort(() => 0.5 - Math.random());
+        // Pick 40
         const selected = shuffled.slice(0, 40).map(q => ({
           ...q,
           isDouble: Math.random() > 0.8
@@ -552,10 +575,11 @@
         );
       }
 
+      // STOPPED STATE (Angepasst: isStopped=true für clear background & no icon)
       if (gameState.status === 'stopped' || (timeLeft === 0 && gameState.status === 'running')) {
         return (
           <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 font-sans">
-            <InfoScreen icon={Clock} message="Die Zeit ist leider abgelaufen" subtext="Komme gerne zurück in den Schulungsraum für die Auswertung." />
+            <InfoScreen isStopped={true} message="Die Zeit ist leider abgelaufen" subtext="Komme gerne zurück in den Schulungsraum für die Auswertung." />
           </div>
         );
       }
